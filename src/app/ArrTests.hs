@@ -65,5 +65,5 @@ testsArray =
   ]
 
 
-main :: IO Counts
-main = runTestTT $ TestList testsArray
+mainTest :: IO Counts
+mainTest = runTestTT $ TestList testsArray

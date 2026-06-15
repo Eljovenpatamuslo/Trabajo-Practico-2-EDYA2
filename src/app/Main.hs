@@ -1,6 +1,6 @@
 module Main (main) where
-import qualified Arr as A
-import qualified Par as P
+import ArrSeq
+import ArrTests
 main :: IO ()
 main = putStrLn "Hello, Haskell!"
 
