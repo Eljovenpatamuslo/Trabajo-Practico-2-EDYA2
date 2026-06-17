@@ -39,18 +39,19 @@ instance Seq A.Arr where
     appendS s t = let
                     ls = (lengthS s) - 1
                     lt = (lengthS t) - 1
-                    (xs,xt) = (reverse (toList s ls),reverse (toList t lt))
-                    in fromList (xs++xt) 
+                    (xs,xt) = (reverse (toList s ls)) P.||| (reverse (toList t lt))
+                    in fromList (xs++xt) --paralelizar
 
     takeS :: A.Arr a -> Int -> A.Arr a
     takeS s n = A.subArray 0 n s
     
     dropS :: A.Arr a -> Int -> A.Arr a
-    dropS s n = A.subArray n (lengthS s) s
+    dropS s n = A.subArray n ((lengthS s)-n) s
 
     showtS :: A.Arr a -> TreeView a (A.Arr a)
     showtS s = case (lengthS s) of
-                1 -> (ELT (nthS s 1)) 
+                0 -> EMPTY
+                1 -> (ELT (nthS s 0)) 
                 n -> NODE (takeS s (div n 2)) 
                           (dropS s (div n 2))
 
@@ -64,10 +65,16 @@ instance Seq A.Arr where
     joinS s = A.flatten s
 
     reduceS :: (a -> a -> a) -> a -> A.Arr a -> a
-    reduceS op b s = b 
+    reduceS op b s = case showtS s of
+        EMPTY -> b
+        ELT v -> v
+        NODE l r -> let (l1,r1) = (reduceS op b l) P.||| (reduceS op b r)
+                    in op l1 r1
+
 
     scanS :: (a -> a -> a) -> a -> A.Arr a -> (A.Arr a, a)
-    scanS op b s = (s,b)
+    scanS op b s = let
+    (,(reduceS op b s))
 
     fromList :: [a] -> A.Arr a
     fromList xs = A.fromList xs
