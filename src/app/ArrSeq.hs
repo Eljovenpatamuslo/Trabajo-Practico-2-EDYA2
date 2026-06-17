@@ -4,6 +4,10 @@ import qualified Arr as A
 import qualified Par as P
 import Seq
 
+toList :: A.Arr a -> Int -> [a]
+toList s 0 = [nthS s 0]
+toList s n = (nthS s n):(toList s (n-1)) 
+
 instance Seq A.Arr where
     emptyS :: A.Arr a
     emptyS = A.empty
@@ -21,25 +25,22 @@ instance Seq A.Arr where
     tabulateS f n = A.tabulate f n
     
     mapS :: (a->b) -> A.Arr a -> A.Arr b
-    mapS f s = 
-        case (lengthS s) of
-            1 -> singletonS (f (nthS s 1))
-
-            --n -> (singletonS (f (nthS s 1))) P.||| 
-            n -> mapS f (dropS s 1)
-
+    mapS f s = tabulateS (aux f s) (lengthS s)
+                    where 
+                        aux f s i = f (nthS s i) 
 
     filterS :: (a -> Bool) -> A.Arr a -> A.Arr a
-    filterS f s = undefined
-        --case (lengthS) of
-        --    1 -> if f (take s 1) then 
-        --    n -> undefined
+    filterS f s = joinS (tabulateS (aux f s) (lengthS s))
+                    where
+                        aux f s i = if f (nthS s i) then singletonS (nthS s i) else emptyS
+
 
     appendS :: A.Arr a -> A.Arr a -> A.Arr a
-    appendS s t = case (lengthS s, lengthS t) of
-                    (0, m) -> t
-                    (n, 0) -> s
-                    (n,m) -> s --mal 
+    appendS s t = let
+                    ls = (lengthS s) - 1
+                    lt = (lengthS t) - 1
+                    (xs,xt) = (reverse (toList s ls),reverse (toList t lt))
+                    in fromList (xs++xt) 
 
     takeS :: A.Arr a -> Int -> A.Arr a
     takeS s n = A.subArray 0 n s
@@ -63,10 +64,10 @@ instance Seq A.Arr where
     joinS s = A.flatten s
 
     reduceS :: (a -> a -> a) -> a -> A.Arr a -> a
-    reduceS op b s = undefined
+    reduceS op b s = b 
 
     scanS :: (a -> a -> a) -> a -> A.Arr a -> (A.Arr a, a)
-    scanS op b s = undefined
+    scanS op b s = (s,b)
 
     fromList :: [a] -> A.Arr a
     fromList xs = A.fromList xs

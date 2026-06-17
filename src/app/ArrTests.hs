@@ -32,6 +32,12 @@ testMapNonEmptySeq =
   TestCase $ assertEqual "Error on non-empty sequence map"
                          (fromList [7,4,5]) (mapS (+1) s3)
 
+testAppendSeq :: Test
+testAppendSeq = 
+  TestCase $ assertEqual "Error on non-empty sequence map"
+                         (fromList [5,1,6,3,4]) (appendS s2 s3)
+
+
 testReduceSumSeq0 :: Test
 testReduceSumSeq0 = 
   TestCase $ assertEqual "Error reducing empty sequence"
@@ -61,6 +67,7 @@ testsArray =
     testReduceSumSeq0,
     testReduceSumSeq3,
     testScanSumSeq0,
+    testAppendSeq,
     testScanSumSeq3
   ]
 
