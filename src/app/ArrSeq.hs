@@ -1,80 +1,98 @@
 {-# LANGUAGE InstanceSigs #-}
 module ArrSeq where
-import qualified Arr as A
-import qualified Par as P
-import Seq
 
-toList :: A.Arr a -> Int -> [a]
-toList s 0 = [nthS s 0]
-toList s n = (nthS s n):(toList s (n-1)) 
+import Seq
+import qualified Arr as A
+import Par ((|||))
+import Arr ((!))
 
 instance Seq A.Arr where
     emptyS :: A.Arr a
     emptyS = A.empty
 
     singletonS :: a -> A.Arr a
-    singletonS x = A.fromList [x]
-    
+    singletonS x = A.tabulate (const x) 1
+
     lengthS :: A.Arr a -> Int
-    lengthS xs = A.length xs
+    lengthS = A.length
 
     nthS :: A.Arr a -> Int -> a
-    nthS xs i = xs A.! i
+    nthS = (!)
 
     tabulateS :: (Int -> a) -> Int -> A.Arr a
-    tabulateS f n = A.tabulate f n
-    
-    mapS :: (a->b) -> A.Arr a -> A.Arr b
-    mapS f s = tabulateS (aux f s) (lengthS s)
-                    where 
-                        aux f s i = f (nthS s i) 
+    tabulateS = A.tabulate
+
+    mapS :: (a -> b) -> A.Arr a -> A.Arr b
+    mapS f s = A.tabulate (\i -> f (s ! i)) (A.length s)
+
 
     filterS :: (a -> Bool) -> A.Arr a -> A.Arr a
-    filterS f s = joinS (tabulateS (aux f s) (lengthS s))
-                    where
-                        aux f s i = if f (nthS s i) then singletonS (nthS s i) else emptyS
-
+    filterS p s = joinS (mapS (\x -> if p x then singletonS x else emptyS) s)
 
     appendS :: A.Arr a -> A.Arr a -> A.Arr a
-    appendS s t = let
-                    ls = (lengthS s) - 1
-                    lt = (lengthS t) - 1
-                    (xs,xt) = (reverse (toList s ls)) P.||| (reverse (toList t lt))
-                    in fromList (xs++xt) --paralelizar
+    appendS s t = 
+        let lenS = A.length s
+            lenT = A.length t
+        in A.tabulate (\i -> if i < lenS then s ! i else t ! (i - lenS)) (lenS + lenT)
 
     takeS :: A.Arr a -> Int -> A.Arr a
-    takeS s n = A.subArray 0 n s
-    
+    takeS s n = 
+        let n' = max 0 (min n (A.length s))
+        in A.subArray 0 n' s
+
     dropS :: A.Arr a -> Int -> A.Arr a
-    dropS s n = A.subArray n ((lengthS s)-n) s
+    dropS s n = 
+        let n' = max 0 (min n (A.length s))
+        in A.subArray n' (A.length s - n') s
 
     showtS :: A.Arr a -> TreeView a (A.Arr a)
-    showtS s = case (lengthS s) of
-                0 -> EMPTY
-                1 -> (ELT (nthS s 0)) 
-                n -> NODE (takeS s (div n 2)) 
-                          (dropS s (div n 2))
+    showtS s =
+        let len = A.length s
+        in if len == 0 then EMPTY
+           else if len == 1 then ELT (s ! 0)
+           else let half = len `div` 2
+                    l = takeS s half
+                    r = dropS s half
+                in NODE l r
 
     showlS :: A.Arr a -> ListView a (A.Arr a)
-    showlS s = case (lengthS s) of
-                0 -> NIL
-                n -> CONS (nthS s 1) (dropS s 1) --ver
-
+    showlS s =
+        if A.length s == 0 then NIL
+        else CONS (s ! 0) (dropS s 1)
 
     joinS :: A.Arr (A.Arr a) -> A.Arr a
-    joinS s = A.flatten s
+    joinS = A.flatten
 
     reduceS :: (a -> a -> a) -> a -> A.Arr a -> a
     reduceS op b s = case showtS s of
         EMPTY -> b
         ELT v -> v
-        NODE l r -> let (l1,r1) = (reduceS op b l) P.||| (reduceS op b r)
+        NODE l r -> let (l1, r1) = reduceS op b l ||| reduceS op b r
                     in op l1 r1
 
-
     scanS :: (a -> a -> a) -> a -> A.Arr a -> (A.Arr a, a)
-    scanS op b s = let
-    (,(reduceS op b s))
+    scanS op b s
+        | A.length s == 0 = (emptyS, b)
+        | A.length s == 1 = (singletonS b, op b (s ! 0))
+        | otherwise =
+            let n = A.length s
+                --sumamos adyacentes de a pares
+                halves = A.tabulate (\i -> op (s ! (2*i)) (s ! (2*i+1))) (n `div` 2)
+                
+                --Llamada recursiva sobre la mitad del tamaño
+                (evens, totalHalves) = scanS op b halves
+                
+                --intercalamos los resultados
+                res = A.tabulate (\i ->
+                        let idx = i `div` 2
+                            base = if idx < A.length evens then evens ! idx else totalHalves
+                        in if even i
+                           then base
+                           else op base (s ! (i - 1))
+                    ) n
+            in if even n
+               then (res, totalHalves)
+               else (res, op totalHalves (s ! (n - 1)))
 
     fromList :: [a] -> A.Arr a
-    fromList xs = A.fromList xs
+    fromList = A.fromList
